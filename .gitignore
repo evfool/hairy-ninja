@@ -17,3 +17,15 @@ Debug/
 src/Makefile.in
 */*~
 
+Makefile
+config.h
+config.log
+config.status
+libtool
+src/.deps/
+src/Makefile
+src/gtk3-sdl2.o
+src/gtk3_sdl2
+src/main.o
+stamp-h1
+
