@@ -11,3 +11,9 @@ Makefile.in
 /depcomp
 /install-sh
 /missing
+.anjuta
+.anjuta_sym_db.db
+Debug/
+src/Makefile.in
+*/*~
+
