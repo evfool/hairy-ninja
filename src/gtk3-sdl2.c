@@ -32,61 +32,62 @@ G_DEFINE_TYPE (Gtk3sdl2, gtk3_sdl2, GTK_TYPE_APPLICATION);
 /* Define the private structure in the .c file */
 #define GTK3_SDL2_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), GTK3_SDL2_TYPE_APPLICATION, Gtk3sdl2Private))
 
-/* The window */
-SDL_Window* sdl_window = NULL;
-	
-/* The window surface */
-SDL_Surface* sdl_screen = NULL;
-
-SDL_Surface* sdl_image = NULL;
-
-guint idle_handler;
-
 struct _Gtk3sdl2Private
 {
 	/* ANJUTA: Widgets declaration for gtk3_sdl2.ui - DO NOT REMOVE */
 	GtkWidget *sdl_area;
+  /* The window */
+  SDL_Window* sdl_window;
 	
+  /* The window surface */
+  SDL_Surface* sdl_screen;
+
+  SDL_Surface* sdl_image;
+
+  guint idle_handler;	
 };
 
-static void
+static gboolean
 draw_sdl (gpointer user_data)
 {
-  SDL_BlitSurface( sdl_image, NULL, sdl_screen, NULL );
-  SDL_UpdateWindowSurface( sdl_window );
+  Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (G_APPLICATION (user_data));
+  SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, NULL);
+  SDL_UpdateWindowSurface (priv->sdl_window);
+  return TRUE;
 }
 
 static void
-setup_sdl (Window x11_window)
+setup_sdl (GApplication *app, Window x11_window)
 {
-	if( SDL_Init( SDL_INIT_VIDEO ) < 0 )
+  Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+	if( SDL_Init (SDL_INIT_VIDEO ) < 0 )
   {
-    g_debug( "SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError() );
+    g_debug ("SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError());
   }
   else
   {
-    sdl_window = SDL_CreateWindowFrom((const void*)
-        x11_window);
-    sdl_screen = SDL_GetWindowSurface( sdl_window );
-    sdl_image = SDL_LoadBMP( LOGO_BMP );
-    idle_handler = g_idle_add ( draw_sdl, NULL);
+    priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
+    priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window);
+    priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
+    priv->idle_handler = g_idle_add (draw_sdl, (gpointer)app);
   }
 }
 
 static void
 cleanup_sdl (GtkApplication *app, gpointer user_data)
 {
-	SDL_FreeSurface( sdl_image );
-  //SDL_DestroyWindow( sdl_window );
-  //SDL_Quit(); 
+  Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+	SDL_FreeSurface (priv->sdl_image); 
 }
 
 static void
 area_resized (GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
-  g_source_remove (idle_handler);
-  idle_handler = g_idle_add ( draw_sdl, NULL);
-  draw_sdl (user_data);
+  GApplication *app = G_APPLICATION (user_data);
+  Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+  g_source_remove (priv->idle_handler);
+  priv->idle_handler = g_idle_add ( draw_sdl, (gpointer) app);
+  draw_sdl ( G_APPLICATION (user_data));
 }
 
 /* Create a new window loading a file */
@@ -133,10 +134,9 @@ gtk3_sdl2_new_window (GApplication *app,
 	// anything else (aka Wayland) on Linux AFAIK
 	g_assert (GDK_IS_X11_WINDOW(gdk_window));
 
-	setup_sdl (gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window)));
+	setup_sdl (app, gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window)));
 		
 	g_object_unref (builder);
-	
 	
 	gtk_window_set_application (GTK_WINDOW (window), GTK_APPLICATION (app));
 	if (file != NULL)
@@ -197,7 +197,7 @@ gtk3_sdl2_new (void)
 	                     "application-id", "org.gnome.gtk3_sdl2",
 	                     "flags", G_APPLICATION_HANDLES_OPEN,
 	                     NULL);
-	g_signal_connect (G_OBJECT (result), "shutdown", G_CALLBACK (cleanup_sdl), NULL);
+	g_signal_connect (G_OBJECT (result), "shutdown", G_CALLBACK (cleanup_sdl), result);
 	return result;
 }
 
