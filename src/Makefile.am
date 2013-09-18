@@ -4,7 +4,7 @@
 
 
 uidir = $(pkgdatadir)/ui
-ui_DATA = gtk3_sdl2.ui
+ui_DATA = gtk3_sdl2.ui sdl_logo.bmp
 
 
 AM_CPPFLAGS = \

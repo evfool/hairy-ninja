@@ -19,7 +19,8 @@
 #include "gtk3-sdl2.h"
 
 /* For testing propose use the local (not installed) ui file */
-/* #define UI_FILE PACKAGE_DATA_DIR"/ui/gtk3_sdl2.ui" */
+//#define UI_FILE PACKAGE_DATA_DIR"/ui/gtk3_sdl2.ui"
+#define LOGO_BMP "src/sdl_logo.bmp"
 #define UI_FILE "src/gtk3_sdl2.ui"
 #define TOP_WINDOW "window"
 #define SDL_AREA "sdl2_area"
@@ -67,7 +68,7 @@ setup_sdl (Window x11_window)
     sdl_window = SDL_CreateWindowFrom((const void*)
         x11_window);
     sdl_screen = SDL_GetWindowSurface( sdl_window );
-    sdl_image = SDL_LoadBMP( "sdl_logo.bmp" );
+    sdl_image = SDL_LoadBMP( LOGO_BMP );
     idle_handler = g_idle_add ( draw_sdl, NULL);
   }
 }
