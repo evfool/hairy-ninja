@@ -5,7 +5,7 @@ SUBDIRS = src
 
 gtk3_sdl2docdir = ${prefix}/doc/gtk3_sdl2
 gtk3_sdl2doc_DATA = \
-	README\
+	README.md\
 	COPYING\
 	AUTHORS\
 	ChangeLog\
