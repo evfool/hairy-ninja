@@ -19,9 +19,10 @@
 #include "gtk3-sdl2.h"
 
 /* For testing propose use the local (not installed) ui file */
-//#define UI_FILE PACKAGE_DATA_DIR"/ui/gtk3_sdl2.ui"
-#define LOGO_BMP "src/sdl_logo.bmp"
-#define UI_FILE "src/gtk3_sdl2.ui"
+#define UI_FILE PACKAGE_DATA_DIR"/ui/gtk3_sdl2.ui"
+#define LOGO_BMP PACKAGE_DATA_DIR"/ui/sdl_logo.bmp"
+//#define LOGO_BMP "src/sdl_logo.bmp"
+//#define UI_FILE "src/gtk3_sdl2.ui"
 #define TOP_WINDOW "window"
 #define SDL_AREA "sdl2_area"
 
