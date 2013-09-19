@@ -27,7 +27,7 @@
 #define TOP_WINDOW "window"
 #define SDL_AREA "sdl2_area"
 
-#define BLITTING 0
+//#define BLITTING 0
 //#define RENDERER 1
 
 G_DEFINE_TYPE (Gtk3sdl2, gtk3_sdl2, GTK_TYPE_APPLICATION);
@@ -45,12 +45,11 @@ struct _Gtk3sdl2Private
   SDL_Surface *sdl_image;
 	
 	/*Renderer specific*/
-#ifdef RENDERER
+#if defined(RENDERER)
   SDL_Renderer *sdl_renderer;
   SDL_Texture *sdl_texture;
-#endif
+#elif defined(BLITTING)
   /*Simple blitting specific*/
-#ifdef BLITTING
 	SDL_Surface *sdl_screen;
 #endif
   guint idle_handler;	
@@ -73,12 +72,11 @@ draw_sdl (gpointer user_data)
   dest_rect.x = gtk_widget_get_allocated_width (priv->sdl_area)/2-priv->sdl_image->w/2;
   dest_rect.y = gtk_widget_get_allocated_height (priv->sdl_area)/2-priv->sdl_image->h/2;
 
-#ifdef RENDERER
+#if defined(RENDERER)
 	SDL_RenderClear(priv->sdl_renderer);
   SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, &dest_rect);
   SDL_RenderPresent(priv->sdl_renderer);
-#endif
-#ifdef BLITTING 
+#elif defined(BLITTING) 
   SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, &dest_rect);
   SDL_UpdateWindowSurface (priv->sdl_window); 
 #endif
@@ -102,7 +100,7 @@ setup_sdl (GApplication *app)
 
 		priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
 		
-#ifdef RENDERER
+#if defined(RENDERER)
 		printf ("Initializing renderer\n");
 		guint i;
     guint num = SDL_GetNumRenderDrivers();
@@ -126,8 +124,7 @@ setup_sdl (GApplication *app)
 		}
 		priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
                                                       priv->sdl_image);
-#endif
-#ifdef BLITTING
+#elif defined(BLITTING)
 		printf ("Initializing blitting\n");
 		priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window); 
 #endif
@@ -143,11 +140,10 @@ cleanup_sdl (GtkApplication *app)
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
 
   SDL_FreeSurface (priv->sdl_image);
-#ifdef RENDERER
+#if defined(RENDERER)
 	SDL_DestroyTexture (priv->sdl_texture);
   SDL_DestroyRenderer (priv->sdl_renderer);
-#endif
-#ifdef BLITTING
+#elif defined(BLITTING)
 	SDL_FreeSurface (priv->sdl_screen);
 #endif
 }
@@ -248,11 +244,10 @@ gtk3_sdl2_init (Gtk3sdl2 *object)
   priv->sdl_image = NULL;
   
   priv->idle_handler = 0;
-#ifdef RENDERER
+#if defined(RENDERER)
 	priv->sdl_renderer = NULL;
   priv->sdl_texture = NULL;
-#endif
-#ifdef BLITTING
+#elif defined(BLITTING)
 	priv->sdl_screen = NULL;
 #endif
 }
