@@ -27,6 +27,8 @@
 #define TOP_WINDOW "window"
 #define SDL_AREA "sdl2_area"
 
+#define BLITTING 0
+//#define RENDERER 1
 
 G_DEFINE_TYPE (Gtk3sdl2, gtk3_sdl2, GTK_TYPE_APPLICATION);
 
@@ -40,13 +42,17 @@ struct _Gtk3sdl2Private
 	GtkWidget *sdl_area;
   /* The window */
   SDL_Window *sdl_window;
-
-  SDL_Renderer *sdl_renderer;
-
-  SDL_Texture *sdl_texture;
-
   SDL_Surface *sdl_image;
-
+	
+	/*Renderer specific*/
+#ifdef RENDERER
+  SDL_Renderer *sdl_renderer;
+  SDL_Texture *sdl_texture;
+#endif
+  /*Simple blitting specific*/
+#ifdef BLITTING
+	SDL_Surface *sdl_screen;
+#endif
   guint idle_handler;	
 };
 
@@ -55,7 +61,6 @@ draw_sdl (gpointer user_data)
 {
   SDL_Rect dest_rect;
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (G_APPLICATION (user_data));
-  SDL_RenderClear(priv->sdl_renderer);
   
   dest_rect.w = priv->sdl_image->w;
   dest_rect.h = priv->sdl_image->h;
@@ -67,10 +72,16 @@ draw_sdl (gpointer user_data)
   
   dest_rect.x = gtk_widget_get_allocated_width (priv->sdl_area)/2-priv->sdl_image->w/2;
   dest_rect.y = gtk_widget_get_allocated_height (priv->sdl_area)/2-priv->sdl_image->h/2;
-  
+
+#ifdef RENDERER
+	SDL_RenderClear(priv->sdl_renderer);
   SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, &dest_rect);
   SDL_RenderPresent(priv->sdl_renderer);
-
+#endif
+#ifdef BLITTING 
+  SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, &dest_rect);
+  SDL_UpdateWindowSurface (priv->sdl_window); 
+#endif
   return TRUE;
 }
 
@@ -78,7 +89,7 @@ static void
 setup_sdl (GApplication *app)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
-  guint i;
+  
 	if( SDL_Init (SDL_INIT_VIDEO ) < 0 )
   {
     g_debug ("SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError());
@@ -87,7 +98,13 @@ setup_sdl (GApplication *app)
   {
     GdkWindow *gdk_window = gtk_widget_get_window (priv->sdl_area);
     Window x11_window = gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window));
-    priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
+		priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
+
+		priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
+		
+#ifdef RENDERER
+		printf ("Initializing renderer\n");
+		guint i;
     guint num = SDL_GetNumRenderDrivers();
     for (i=0;i<num;i++) {
       SDL_RendererInfo info;
@@ -106,12 +123,15 @@ setup_sdl (GApplication *app)
                                             -1, 
                                             SDL_RENDERER_ACCELERATED
                                             | SDL_RENDERER_TARGETTEXTURE);
-    }
-    
-    priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
-    
-    priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
+		}
+		priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
                                                       priv->sdl_image);
+#endif
+#ifdef BLITTING
+		printf ("Initializing blitting\n");
+		priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window); 
+#endif
+    
     priv->idle_handler = g_idle_add (draw_sdl, (gpointer)app);
     
   }
@@ -121,9 +141,15 @@ static void
 cleanup_sdl (GtkApplication *app)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+
   SDL_FreeSurface (priv->sdl_image);
+#ifdef RENDERER
 	SDL_DestroyTexture (priv->sdl_texture);
   SDL_DestroyRenderer (priv->sdl_renderer);
+#endif
+#ifdef BLITTING
+	SDL_FreeSurface (priv->sdl_screen);
+#endif
 }
 
 static void
@@ -220,9 +246,15 @@ gtk3_sdl2_init (Gtk3sdl2 *object)
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE(object);
   priv->sdl_window = NULL;
   priv->sdl_image = NULL;
-  priv->sdl_renderer = NULL;
+  
   priv->idle_handler = 0;
+#ifdef RENDERER
+	priv->sdl_renderer = NULL;
   priv->sdl_texture = NULL;
+#endif
+#ifdef BLITTING
+	priv->sdl_screen = NULL;
+#endif
 }
 
 static void
@@ -245,6 +277,7 @@ gtk3_sdl2_class_init (Gtk3sdl2Class *klass)
 Gtk3sdl2 *
 gtk3_sdl2_new (void)
 {
+	g_type_init ();
 	Gtk3sdl2 * result = g_object_new (gtk3_sdl2_get_type (),
 	                     "application-id", "org.gnome.gtk3_sdl2",
 	                     "flags", G_APPLICATION_HANDLES_OPEN,
