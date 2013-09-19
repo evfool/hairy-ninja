@@ -17,10 +17,11 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "gtk3-sdl2.h"
-
 /* For testing propose use the local (not installed) ui file */
 #define UI_FILE PACKAGE_DATA_DIR"/ui/gtk3_sdl2.ui"
 #define LOGO_BMP PACKAGE_DATA_DIR"/ui/sdl_logo.bmp"
+#define SHIP_SVG PACKAGE_DATA_DIR"/ui/ship.svg"
+//#define SHIP_SVG "src/ship.svg"
 //#define LOGO_BMP "src/sdl_logo.bmp"
 //#define UI_FILE "src/gtk3_sdl2.ui"
 #define TOP_WINDOW "window"
@@ -52,16 +53,29 @@ struct _Gtk3sdl2Private
 static gboolean
 draw_sdl (gpointer user_data)
 {
+  SDL_Rect dest_rect;
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (G_APPLICATION (user_data));
   SDL_RenderClear(priv->sdl_renderer);
-  SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, NULL);
+  
+  dest_rect.w = priv->sdl_image->w;
+  dest_rect.h = priv->sdl_image->h;
+
+  
+  //dest_rect.h = gtk_widget_get_allocated_height (priv->sdl_area);
+  //dest_rect.w = gtk_widget_get_allocated_width (priv->sdl_area);
+
+  
+  dest_rect.x = gtk_widget_get_allocated_width (priv->sdl_area)/2-priv->sdl_image->w/2;
+  dest_rect.y = gtk_widget_get_allocated_height (priv->sdl_area)/2-priv->sdl_image->h/2;
+  
+  SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, &dest_rect);
   SDL_RenderPresent(priv->sdl_renderer);
 
   return TRUE;
 }
 
 static void
-setup_sdl (GApplication *app, Window x11_window)
+setup_sdl (GApplication *app)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
   guint i;
@@ -71,6 +85,8 @@ setup_sdl (GApplication *app, Window x11_window)
   }
   else
   {
+    GdkWindow *gdk_window = gtk_widget_get_window (priv->sdl_area);
+    Window x11_window = gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window));
     priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
     guint num = SDL_GetNumRenderDrivers();
     for (i=0;i<num;i++) {
@@ -92,11 +108,10 @@ setup_sdl (GApplication *app, Window x11_window)
                                             | SDL_RENDERER_TARGETTEXTURE);
     }
     
-    
     priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
+    
     priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
                                                       priv->sdl_image);
-    SDL_FreeSurface (priv->sdl_image);
     priv->idle_handler = g_idle_add (draw_sdl, (gpointer)app);
   }
 }
@@ -105,6 +120,7 @@ static void
 cleanup_sdl (GtkApplication *app, gpointer user_data)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+  SDL_FreeSurface (priv->sdl_image);
 	SDL_DestroyTexture (priv->sdl_texture);
   SDL_DestroyRenderer (priv->sdl_renderer);
 }
@@ -115,7 +131,8 @@ area_resized (GtkWidget *widget, GdkEvent *event, gpointer user_data)
   GApplication *app = G_APPLICATION (user_data);
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
   g_source_remove (priv->idle_handler);
-  priv->idle_handler = g_idle_add ( draw_sdl, (gpointer) app);
+  cleanup_sdl (app, app);
+  setup_sdl (app);
   draw_sdl ( G_APPLICATION (user_data));
 }
 
@@ -163,7 +180,7 @@ gtk3_sdl2_new_window (GApplication *app,
 	// anything else (aka Wayland) on Linux AFAIK
 	g_assert (GDK_IS_X11_WINDOW(gdk_window));
 
-	setup_sdl (app, gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window)));
+	setup_sdl (app);
 		
 	g_object_unref (builder);
 	
