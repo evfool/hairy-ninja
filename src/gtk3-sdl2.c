@@ -27,6 +27,7 @@
 #define TOP_WINDOW "window"
 #define SDL_AREA "sdl2_area"
 
+#define FPS 60
 //#define BLITTING 0
 //#define RENDERER 1
 
@@ -129,8 +130,7 @@ setup_sdl (GApplication *app)
 		priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window); 
 #endif
     
-    priv->idle_handler = g_idle_add (draw_sdl, (gpointer)app);
-    
+    priv->idle_handler = g_timeout_add (1000/FPS, draw_sdl, (gpointer)app);
   }
 }
 
