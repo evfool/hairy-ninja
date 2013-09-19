@@ -38,12 +38,13 @@ struct _Gtk3sdl2Private
 	/* ANJUTA: Widgets declaration for gtk3_sdl2.ui - DO NOT REMOVE */
 	GtkWidget *sdl_area;
   /* The window */
-  SDL_Window* sdl_window;
-	
-  /* The window surface */
-  SDL_Surface* sdl_screen;
+  SDL_Window *sdl_window;
 
-  SDL_Surface* sdl_image;
+  SDL_Renderer *sdl_renderer;
+
+  SDL_Texture *sdl_texture;
+
+  SDL_Surface *sdl_image;
 
   guint idle_handler;	
 };
@@ -52,8 +53,10 @@ static gboolean
 draw_sdl (gpointer user_data)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (G_APPLICATION (user_data));
-  SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, NULL);
-  SDL_UpdateWindowSurface (priv->sdl_window);
+  SDL_RenderClear(priv->sdl_renderer);
+  SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, NULL);
+  SDL_RenderPresent(priv->sdl_renderer);
+
   return TRUE;
 }
 
@@ -61,6 +64,7 @@ static void
 setup_sdl (GApplication *app, Window x11_window)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+  guint i;
 	if( SDL_Init (SDL_INIT_VIDEO ) < 0 )
   {
     g_debug ("SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError());
@@ -68,8 +72,31 @@ setup_sdl (GApplication *app, Window x11_window)
   else
   {
     priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
-    priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window);
+    guint num = SDL_GetNumRenderDrivers();
+    for (i=0;i<num;i++) {
+      SDL_RendererInfo info;
+      SDL_GetRenderDriverInfo(i, &info);
+      printf ("Renderer %d: %s\n",i, info.name);
+    }
+    guint window_flags = SDL_GetWindowFlags(priv->sdl_window);
+    if (!(window_flags & SDL_WINDOW_OPENGL)) {
+      printf ("Window doesn't support OpenGL, using software rendering\n");
+      priv->sdl_renderer = SDL_CreateRenderer(priv->sdl_window, 
+                                            -1, 
+                                            SDL_RENDERER_SOFTWARE
+                                            | SDL_RENDERER_TARGETTEXTURE);
+    } else {
+      priv->sdl_renderer = SDL_CreateRenderer(priv->sdl_window, 
+                                            -1, 
+                                            SDL_RENDERER_ACCELERATED
+                                            | SDL_RENDERER_TARGETTEXTURE);
+    }
+    
+    
     priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
+    priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
+                                                      priv->sdl_image);
+    SDL_FreeSurface (priv->sdl_image);
     priv->idle_handler = g_idle_add (draw_sdl, (gpointer)app);
   }
 }
@@ -78,7 +105,8 @@ static void
 cleanup_sdl (GtkApplication *app, gpointer user_data)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
-	SDL_FreeSurface (priv->sdl_image); 
+	SDL_DestroyTexture (priv->sdl_texture);
+  SDL_DestroyRenderer (priv->sdl_renderer);
 }
 
 static void
@@ -171,7 +199,12 @@ gtk3_sdl2_open (GApplication  *application,
 static void
 gtk3_sdl2_init (Gtk3sdl2 *object)
 {
-
+  Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE(object);
+  priv->sdl_window = NULL;
+  priv->sdl_image = NULL;
+  priv->sdl_renderer = NULL;
+  priv->idle_handler = 0;
+  priv->sdl_texture = NULL;
 }
 
 static void
