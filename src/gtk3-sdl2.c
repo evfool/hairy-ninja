@@ -117,7 +117,7 @@ setup_sdl (GApplication *app)
 }
 
 static void
-cleanup_sdl (GtkApplication *app, gpointer user_data)
+cleanup_sdl (GtkApplication *app)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
   SDL_FreeSurface (priv->sdl_image);
@@ -131,7 +131,7 @@ area_resized (GtkWidget *widget, GdkEvent *event, gpointer user_data)
   GApplication *app = G_APPLICATION (user_data);
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
   g_source_remove (priv->idle_handler);
-  cleanup_sdl (app, app);
+  cleanup_sdl ((gpointer)app);
   setup_sdl (app);
   draw_sdl ( G_APPLICATION (user_data));
 }
@@ -248,7 +248,7 @@ gtk3_sdl2_new (void)
 	                     "application-id", "org.gnome.gtk3_sdl2",
 	                     "flags", G_APPLICATION_HANDLES_OPEN,
 	                     NULL);
-	g_signal_connect (G_OBJECT (result), "shutdown", G_CALLBACK (cleanup_sdl), result);
+	g_signal_connect (G_OBJECT (result), "shutdown", G_CALLBACK (cleanup_sdl), NULL);
 	return result;
 }
 
