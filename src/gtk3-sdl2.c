@@ -29,7 +29,7 @@
 
 #define FPS 60
 //#define BLITTING 0
-//#define RENDERER 1
+#define RENDERER 1
 
 G_DEFINE_TYPE (Gtk3sdl2, gtk3_sdl2, GTK_TYPE_APPLICATION);
 
@@ -44,7 +44,9 @@ struct _Gtk3sdl2Private
   /* The window */
   SDL_Window *sdl_window;
   SDL_Surface *sdl_image;
-	
+  guint start_clock;
+  gfloat fps;
+  
 	/*Renderer specific*/
 #if defined(RENDERER)
   SDL_Renderer *sdl_renderer;
@@ -81,6 +83,11 @@ draw_sdl (gpointer user_data)
   SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, &dest_rect);
   SDL_UpdateWindowSurface (priv->sdl_window); 
 #endif
+  guint delta = SDL_GetTicks() - priv->start_clock;
+  priv->start_clock = SDL_GetTicks();
+  if (delta != 0)
+    priv->fps = 1000/delta;
+  printf("%.2f\n", priv->fps);
   return TRUE;
 }
 
@@ -89,13 +96,7 @@ setup_sdl (GApplication *app)
 {
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
   
-	if( SDL_Init (SDL_INIT_VIDEO ) < 0 )
-  {
-    g_debug ("SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError());
-  }
-  else
-  {
-    GdkWindow *gdk_window = gtk_widget_get_window (priv->sdl_area);
+	  GdkWindow *gdk_window = gtk_widget_get_window (priv->sdl_area);
     Window x11_window = gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window));
 		priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
 
@@ -131,7 +132,7 @@ setup_sdl (GApplication *app)
 #endif
     
     priv->idle_handler = g_timeout_add (1000/FPS, draw_sdl, (gpointer)app);
-  }
+  
 }
 
 static void
@@ -192,8 +193,12 @@ gtk3_sdl2_new_window (GApplication *app,
 				TOP_WINDOW,
 				UI_FILE);
         }
-
-	
+  if( SDL_Init (SDL_INIT_VIDEO ) < 0 )
+  {
+    g_debug ("SDL2 could not initialize! SDL2_Error: %s\n", SDL_GetError());
+  }
+  priv->start_clock = SDL_GetTicks();
+  
 	/* ANJUTA: Widgets initialization for gtk3_sdl2.ui - DO NOT REMOVE */
   priv->sdl_area = GTK_WIDGET (gtk_builder_get_object (builder, SDL_AREA));
   g_signal_connect (G_OBJECT (priv->sdl_area), "configure-event", 
