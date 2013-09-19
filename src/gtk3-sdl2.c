@@ -113,6 +113,7 @@ setup_sdl (GApplication *app)
     priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
                                                       priv->sdl_image);
     priv->idle_handler = g_idle_add (draw_sdl, (gpointer)app);
+    
   }
 }
 
