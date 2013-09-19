@@ -51,6 +51,7 @@ struct _Gtk3sdl2Private
 	guint height;
 	guint x;
 	guint y;
+	cairo_t *cairo_context;
 	
 	/*Renderer specific*/
 #if defined(RENDERER)
@@ -71,7 +72,6 @@ draw_sdl (gpointer user_data)
   
   dest_rect.w = priv->sdl_image->w;
   dest_rect.h = priv->sdl_image->h;
-
   
   dest_rect.x = priv->width/2-priv->sdl_image->w/2;
   dest_rect.y = priv->height/2-priv->sdl_image->h/2;
@@ -81,12 +81,32 @@ draw_sdl (gpointer user_data)
   SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, &dest_rect);
   SDL_RenderPresent(priv->sdl_renderer);
 #else 
-	//SDL_Color black  = {0,0,0};
+	
 	SDL_FillRect (priv->sdl_screen, NULL, NULL);
   SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, &dest_rect);
   SDL_UpdateWindowSurface (priv->sdl_window); 
 #endif
-  return TRUE;
+	printf("Getting cairo context%p\n", priv->cairo_context);
+  if (priv->cairo_context) {
+	  cairo_set_line_width (priv->cairo_context, 2.0);
+	  cairo_set_source_rgb (priv->cairo_context, 1.0, 0.0, 0.0);
+	  cairo_line_to (priv->cairo_context, priv->width, priv->height);
+	  cairo_stroke (priv->cairo_context);
+		cairo_paint (priv->cairo_context);
+	}
+	
+  return FALSE;
+}
+
+static gboolean
+draw_cairo (GtkWidget *widget, cairo_t *context, gpointer user_data)
+{
+	Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (G_APPLICATION (user_data));
+	printf("Setting cairo context%p\n", context);
+	priv->cairo_context = context;
+	
+	draw_sdl (user_data);
+  return FALSE;
 }
 
 static void
@@ -288,6 +308,8 @@ gtk3_sdl2_new_window (GApplication *app,
 	                  G_CALLBACK (area_moved), app);
 	g_signal_connect (G_OBJECT (priv->sdl_area), "configure-event", 
                     G_CALLBACK (area_resized), app);
+	g_signal_connect (G_OBJECT (priv->sdl_area), "draw",
+	                  G_CALLBACK (draw_cairo), app);
 	gdk_window = gtk_widget_get_window(priv->sdl_area);
   // fail if we're not on X11, as SDL2 does not support 
 	// anything else (aka Wayland) on Linux AFAIK
