@@ -20,7 +20,9 @@ LT_INIT
 
 
 
-PKG_CHECK_MODULES(GTK3_SDL2, [gtk+-3.0 >= 2.90.3 x11 sdl2])
+PKG_CHECK_MODULES(GTK3_SDL2, libpng12
+libxml-2.0
+[gtk+-3.0 >= 2.90.3 x11 sdl2])
 
 
 

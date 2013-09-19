@@ -23,6 +23,7 @@
 #include <gtk/gtk.h>
 #include <SDL2/SDL.h>
 #include <gdk/gdkx.h>
+#include "SDL_svg.h"
 
 G_BEGIN_DECLS
 
