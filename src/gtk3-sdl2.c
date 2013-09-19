@@ -27,6 +27,8 @@
 #define TOP_WINDOW "window"
 #define SDL_AREA "sdl2_area"
 
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
 #define FPS 60
 //#define BLITTING 0
 //#define RENDERER 1
@@ -41,18 +43,23 @@ struct _Gtk3sdl2Private
 {
 	/* ANJUTA: Widgets declaration for gtk3_sdl2.ui - DO NOT REMOVE */
 	GtkWidget *sdl_area;
+	
   /* The window */
   SDL_Window *sdl_window;
   SDL_Surface *sdl_image;
+  guint width;
+	guint height;
+	guint x;
+	guint y;
 	
 	/*Renderer specific*/
 #if defined(RENDERER)
   SDL_Renderer *sdl_renderer;
   SDL_Texture *sdl_texture;
-#elif defined(BLITTING)
+#endif
   /*Simple blitting specific*/
 	SDL_Surface *sdl_screen;
-#endif
+
   guint idle_handler;	
 };
 
@@ -66,18 +73,16 @@ draw_sdl (gpointer user_data)
   dest_rect.h = priv->sdl_image->h;
 
   
-  //dest_rect.h = gtk_widget_get_allocated_height (priv->sdl_area);
-  //dest_rect.w = gtk_widget_get_allocated_width (priv->sdl_area);
-
-  
-  dest_rect.x = gtk_widget_get_allocated_width (priv->sdl_area)/2-priv->sdl_image->w/2;
-  dest_rect.y = gtk_widget_get_allocated_height (priv->sdl_area)/2-priv->sdl_image->h/2;
+  dest_rect.x = priv->width/2-priv->sdl_image->w/2;
+  dest_rect.y = priv->height/2-priv->sdl_image->h/2;
 
 #if defined(RENDERER)
 	SDL_RenderClear(priv->sdl_renderer);
   SDL_RenderCopy(priv->sdl_renderer, priv->sdl_texture, NULL, &dest_rect);
   SDL_RenderPresent(priv->sdl_renderer);
-#elif defined(BLITTING) 
+#else 
+	//SDL_Color black  = {0,0,0};
+	SDL_FillRect (priv->sdl_screen, NULL, NULL);
   SDL_BlitSurface (priv->sdl_image, NULL, priv->sdl_screen, &dest_rect);
   SDL_UpdateWindowSurface (priv->sdl_window); 
 #endif
@@ -95,39 +100,70 @@ setup_sdl (GApplication *app)
   }
   else
   {
-    GdkWindow *gdk_window = gtk_widget_get_window (priv->sdl_area);
-    Window x11_window = gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window));
-		priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
-
-		priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
-		
+		if (priv->sdl_window == NULL)
+		  {
+        GdkWindow *gdk_window = gtk_widget_get_window (priv->sdl_area);
+        Window x11_window = gdk_x11_window_get_xid (GDK_X11_WINDOW (gdk_window));
+		    priv->sdl_window = SDL_CreateWindowFrom ( (const void*)x11_window);
+			}
+		else
+		  {
+				SDL_SetWindowSize (priv->sdl_window, priv->width, priv->height);
+				SDL_ShowWindow (priv->sdl_window);
+			}
+		if (priv->sdl_image == NULL) 
+		  {
+				priv->sdl_image = SDL_LoadBMP ( LOGO_BMP );
+			}
 #if defined(RENDERER)
-		printf ("Initializing renderer\n");
-		guint i;
-    guint num = SDL_GetNumRenderDrivers();
-    for (i=0;i<num;i++) {
-      SDL_RendererInfo info;
-      SDL_GetRenderDriverInfo(i, &info);
-      printf ("Renderer %d: %s\n",i, info.name);
-    }
-    guint window_flags = SDL_GetWindowFlags(priv->sdl_window);
-    if (!(window_flags & SDL_WINDOW_OPENGL)) {
-      printf ("Window doesn't support OpenGL, using software rendering\n");
-      priv->sdl_renderer = SDL_CreateRenderer(priv->sdl_window, 
-                                            -1, 
-                                            SDL_RENDERER_SOFTWARE
-                                            | SDL_RENDERER_TARGETTEXTURE);
-    } else {
-      priv->sdl_renderer = SDL_CreateRenderer(priv->sdl_window, 
-                                            -1, 
-                                            SDL_RENDERER_ACCELERATED
-                                            | SDL_RENDERER_TARGETTEXTURE);
+		if (priv->sdl_renderer == NULL)
+		{
+		  printf ("Initializing renderer\n");
+		  guint i;
+      guint num = SDL_GetNumRenderDrivers();
+      for (i=0;i<num;i++) {
+        SDL_RendererInfo info;
+        SDL_GetRenderDriverInfo(i, &info);
+        printf ("Renderer %d: %s\n",i, info.name);
+      }
+      guint window_flags = SDL_GetWindowFlags(priv->sdl_window);
+      if (!(window_flags & SDL_WINDOW_OPENGL)) {
+        printf ("Window doesn't support OpenGL, using software rendering\n");
+        priv->sdl_renderer = SDL_CreateRenderer(priv->sdl_window, 
+                                              -1, 
+                                              SDL_RENDERER_SOFTWARE
+                                              | SDL_RENDERER_TARGETTEXTURE);
+      } else {
+        priv->sdl_renderer = SDL_CreateRenderer(priv->sdl_window, 
+                                              -1, 
+                                              SDL_RENDERER_ACCELERATED
+                                              | SDL_RENDERER_TARGETTEXTURE);
+		  }
 		}
-		priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
-                                                      priv->sdl_image);
+		if (priv->sdl_texture == NULL)
+		{
+			priv->sdl_texture = SDL_CreateTextureFromSurface (priv->sdl_renderer,
+                                                       priv->sdl_image);
+		}
 #elif defined(BLITTING)
-		printf ("Initializing blitting\n");
-		priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window); 
+		if (priv->sdl_screen == NULL)
+		{
+			printf ("Initializing blitting\n");
+			priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window);
+		}
+#else
+		if (priv->sdl_screen == NULL)
+		{
+			printf ("Initializing separate window\n");
+
+			gint x, y;
+			gdk_window_get_origin (gtk_widget_get_window (priv->sdl_area), &x, &y);
+		
+			priv->sdl_window = SDL_CreateWindow ("SDL Window", x, y, 
+				                                   priv->width, priv->height, 
+				                                   SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
+			priv->sdl_screen = SDL_GetWindowSurface (priv->sdl_window);
+		}
 #endif
     
     priv->idle_handler = g_timeout_add (1000/FPS, draw_sdl, (gpointer)app);
@@ -140,23 +176,73 @@ cleanup_sdl (GtkApplication *app)
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
 
   SDL_FreeSurface (priv->sdl_image);
+	priv->sdl_image = NULL;
 #if defined(RENDERER)
 	SDL_DestroyTexture (priv->sdl_texture);
+	priv->sdl_texture = NULL;
   SDL_DestroyRenderer (priv->sdl_renderer);
-#elif defined(BLITTING)
-	SDL_FreeSurface (priv->sdl_screen);
+	priv->sdl_renderer = NULL;
 #endif
+	SDL_FreeSurface (priv->sdl_screen);
+	priv->sdl_screen = NULL;
+  SDL_DestroyWindow (priv->sdl_window);
+	priv->sdl_window = NULL;
 }
 
 static void
 area_resized (GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
   GApplication *app = G_APPLICATION (user_data);
-  Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
-  g_source_remove (priv->idle_handler);
-  cleanup_sdl ((gpointer)app);
-  setup_sdl (app);
-  draw_sdl ( G_APPLICATION (user_data));
+
+	Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+	guint width = gtk_widget_get_allocated_width (priv->sdl_area);
+	guint height = gtk_widget_get_allocated_height (priv->sdl_area);
+  gint x, y;
+	gdk_window_get_origin (gtk_widget_get_window (priv->sdl_area), &x, &y);
+			
+	if (width != priv->width || height !=priv->height)
+	  {
+			printf ("Resized\n");
+      g_source_remove (priv->idle_handler);
+			
+			priv->width = width;
+		  priv->height = height;
+			cleanup_sdl (app);
+			setup_sdl (app);
+      draw_sdl ( G_APPLICATION (user_data));
+		  
+	  } 
+	else if (x != priv->x || y != priv->y) 
+	  {
+			printf ("Moved\n");
+			priv->x = x;
+			priv->y = y;
+#if (!defined(RENDERER) && !defined(BLITTING))
+			SDL_SetWindowPosition (priv->sdl_window, x, y);
+			SDL_ShowWindow (priv->sdl_window);
+#endif
+	  }
+}
+
+static void
+area_moved (GtkWidget *widget, GdkRectangle *rect, gpointer user_data)
+{
+  GApplication *app = G_APPLICATION (user_data);
+
+	Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE (app);
+	gint x, y;
+	gdk_window_get_origin (gtk_widget_get_window (priv->sdl_area), &x, &y);
+			
+	if (x != priv->x || y != priv->y) 
+	  {
+			printf ("Moved\n");
+			priv->x = x;
+			priv->y = y;
+#if (!defined(RENDERER) && !defined(BLITTING))
+			SDL_SetWindowPosition (priv->sdl_window, x, y);
+			SDL_ShowWindow (priv->sdl_window);
+#endif
+	  }
 }
 
 /* Create a new window loading a file */
@@ -196,7 +282,11 @@ gtk3_sdl2_new_window (GApplication *app,
 	
 	/* ANJUTA: Widgets initialization for gtk3_sdl2.ui - DO NOT REMOVE */
   priv->sdl_area = GTK_WIDGET (gtk_builder_get_object (builder, SDL_AREA));
-  g_signal_connect (G_OBJECT (priv->sdl_area), "configure-event", 
+	
+	gtk_widget_set_size_request (priv->sdl_area, priv->width, priv->height);
+	g_signal_connect (G_OBJECT (priv->sdl_area), "size-allocated", 
+	                  G_CALLBACK (area_moved), app);
+	g_signal_connect (G_OBJECT (priv->sdl_area), "configure-event", 
                     G_CALLBACK (area_resized), app);
 	gdk_window = gtk_widget_get_window(priv->sdl_area);
   // fail if we're not on X11, as SDL2 does not support 
@@ -242,14 +332,17 @@ gtk3_sdl2_init (Gtk3sdl2 *object)
   Gtk3sdl2Private *priv = GTK3_SDL2_GET_PRIVATE(object);
   priv->sdl_window = NULL;
   priv->sdl_image = NULL;
-  
+  priv->width = WINDOW_WIDTH;
+	priv->height = WINDOW_HEIGHT;
+	priv->x = 0;
+	priv->y = 0;
   priv->idle_handler = 0;
 #if defined(RENDERER)
 	priv->sdl_renderer = NULL;
   priv->sdl_texture = NULL;
-#elif defined(BLITTING)
-	priv->sdl_screen = NULL;
 #endif
+	priv->sdl_screen = NULL;
+
 }
 
 static void
